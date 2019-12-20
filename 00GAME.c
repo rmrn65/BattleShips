@@ -13,6 +13,7 @@ typedef struct _WIN_struct {
 	int startx, starty;
 	int height, width;
 	WIN_BORDER border;
+	//WINDOW* win;
 }WIN;
 //functii
 char** file_in_char(FILE* fptr);
@@ -20,40 +21,38 @@ void init_main_win(WIN* win,int h,int w,int lines,int cols);
 void print_win_params(WIN *p_win);
 void create_box(WIN *p_win);
 void mainScreen(WIN* win,char** ascii_art);
-void mainScreenOp(WIN* win,char string[3][100],int nr_op);
+void mainScreenOp(WIN* win,char* string[3],int nr_op);
 void menu_screen_navigation(WIN *menu_win, int highlight);
+void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices);
+void navigate(WINDOW *menu_win,int highlight,char* choices[3],int n_choices);
+void destroy_win(WINDOW* local_win);//07Win.c
+
+WINDOW* create_newwin(int height,int width,int starty,int startx);
+
 //main
 int main()
 {
     FILE *ascii;
     char** ascii_art;
-    char* options[3]={"New Game","Laderboard","Quit"};
-    int highlight = 0;
-
+    char* options[3]={"New Game","Resume Game","Quit"};
+    int highlight = 1;
   	int row,col;
 	initscr();
+	clear();
 	noecho();
-	refresh();
+	cbreak();
+	keypad(stdscr,TRUE);
 	ascii_art = file_in_char(ascii);
 	WIN Main_win;
-	WINDOW* Menu_win;
 	init_main_win(&Main_win,30,110,LINES,COLS);
-	init_main_win(&Menu_win,4,15,LINES,COLS+7);
 	create_box(&Main_win);
-	//create_box(&Menu_win);
 	mainScreen(&Main_win,ascii_art);
-	//mainScreenOp(&Menu_win,options,3);
- 	while(1)
- 	{
- 		
- 		char d; 
- 		d = getch();
- 		if(d == 'q')
- 		{
- 			endwin();
- 			break;
- 		}
- 	}
+	WINDOW* Menu_win;
+	refresh();
+	Menu_win = create_newwin(10,20,(LINES-5)/2,(COLS - 10)/2);
+	print_menu(Menu_win,highlight,options,3);
+	navigate(Menu_win,highlight,options,3);
+	endwin();
     return 0;
 }
 void mainScreen(WIN* win,char** ascii_art)
@@ -76,6 +75,41 @@ void mainScreenOp(WIN* win,char* string[3],int nr_op)
 	}
 
 }
+WINDOW* create_newwin(int height,int width,int starty,int startx) 
+{
+	WINDOW* local_win;
+	local_win = newwin(height,width,starty,startx);
+	box(local_win,0,0);//
+	wrefresh(local_win);
+	return local_win;
+}
+void navigate(WINDOW *menu_win,int highlight,char* choices[3],int n_choices)
+{
+	int ch;
+	int exit = 0;
+	while((ch = getch()))
+	{
+		switch(ch)
+		{
+			case KEY_UP:
+				if(highlight > 1)
+	 				highlight--;
+	 			print_menu(menu_win,highlight,choices,n_choices);
+				break;	
+			case KEY_DOWN:
+				if(highlight < n_choices)
+	 				highlight++;
+	 			print_menu(menu_win,highlight,choices,n_choices);
+				break;	
+			case '\n'://KEY_ENTER n-a mers
+			if(highlight == 3)
+				exit = 1;
+			break;
+		}	
+		if(exit == 1)
+			break;
+	}
+}
 void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices)
 {
 	int x, y, i;	
@@ -94,16 +128,22 @@ void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices)
 	}
 	wrefresh(menu_win);
 }
+void destroy_win(WINDOW* local_win)//07Win.c
+{
+	wborder(local_win,' ',' ',' ',' ',' ',' ',' ',' ');
+	wrefresh(local_win);
+	delwin(local_win);
+}
 void init_main_win(WIN* win,int h,int w,int lines,int cols)
 {
 	win->height = h;
 	win->width = w;
 	win->starty = (lines - win->height)/2;	
 	win->startx = (cols - win->width)/2;
-	win->border.ls = '|';
-	win->border.rs = '|';
-	win->border.ts = '-';
-	win->border.bs = '-';
+	win->border.ls = '#';
+	win->border.rs = '#';
+	win->border.ts = '*';
+	win->border.bs = '*';
 	win->border.tl = '+';
 	win->border.tr = '+';
 	win->border.bl = '+';
