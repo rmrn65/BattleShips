@@ -37,7 +37,8 @@ void mainScreen(WIN* win,char** ascii_art);
 void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices);
 void destroy_win(WINDOW* local_win);//07Win.c
 WINDOW* initNewGame(WIN* main_win);
-void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enemy_board,int** my_board_01);
+void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy
+		,int** enemy_board,int** my_board_01,int* count_visited);
 
 WINDOW* create_newwin(int height,int width,int starty,int startx);
 
@@ -76,6 +77,7 @@ int main()
 	int** visited_enemy;
 	int** enemy_board;
 	int** my_board_01;
+	int count_visited;
 	while((ch = getch()))
 	{
 		switch(ch)
@@ -98,9 +100,10 @@ int main()
 					visited_enemy = init_mat();
 					enemy_board = generate_enemy_board();//trebuie adaugat in Game
 					my_board_01 = my_board_in_01();//trebuie adaugant in Game
+					count_visited = 0;
 					Game_win = initNewGame(&Main_win);
-					Game(Game_win,&Main_win,visited,visited_enemy,enemy_board,my_board_01);
-					scr_dump("savefile.txt");
+					Game(Game_win,&Main_win,visited,visited_enemy,enemy_board,my_board_01,&count_visited);
+					mvprintw(1,1,"%d",count_visited);
 					init_main_win(&Main_win,30,110,LINES,COLS);
 					create_box(&Main_win);
 					mainScreen(&Main_win,ascii_art);
@@ -111,7 +114,8 @@ int main()
 			 	{
 			 		scr_restore("savefile.txt");
 			 		refresh();
-			 		Game(Game_win,&Main_win,visited,visited_enemy,enemy_board,my_board_01);
+			 		Game(Game_win,&Main_win,visited,visited_enemy,enemy_board,my_board_01,&count_visited);
+					mvprintw(1,1,"%d",count_visited);
 					init_main_win(&Main_win,30,110,LINES,COLS);
 					create_box(&Main_win);
 					mainScreen(&Main_win,ascii_art);
@@ -211,7 +215,8 @@ WINDOW* initNewGame(WIN* main_win)
 	}
 	return win;
 }
-void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enemy_board,int** my_board_01)
+void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,
+	int** enemy_board,int** my_board_01,int* count_visited)
 {
 	int y,x;
 	getmaxyx(win,y,x);
@@ -234,7 +239,6 @@ void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enem
 	int turn = 0;
 	//for d case
 	int bombs = 10;
-	int count_visited = 0;
 	chr = 'a';
 	while(chr != 'q')
 	{
@@ -294,7 +298,7 @@ void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enem
 			
 			case 'd':
 			bombs = 10;
-			while(bombs != 0 && count_visited<100)
+			while(bombs != 0 && *count_visited<100)
 			{
 				// /sleep(1);
 				int y_rand = rand() % 10;
@@ -342,7 +346,7 @@ void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enem
 				}
 				wrefresh(win);
 				bombs--;
-				count_visited++;
+				*count_visited = *count_visited + 1;
 			}
 			break;
 			//!!!! separa navele ca entitati !!!!
@@ -351,10 +355,10 @@ void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enem
 		}
 		wrefresh(win);
 		raw();
-		while(turn == 1 && count_visited < 100)
+		while(turn == 1 && *count_visited < 100)
 		if(attacked == 1)
 		{
-			sleep(3);
+			//sleep(3);
 			//!!!numar 3 secunde in care se va aplica getch()!!!!
 			attacked = 0;
 			int y_rand = rand() % 10;
@@ -381,7 +385,7 @@ void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enem
 					wmove(win,boardy,boardx);
 					turn = 0;
 				}
-			count_visited++;// pentru a nu sari de numarul de spatii
+			*count_visited = *count_visited + 1;// pentru a nu sari de numarul de spatii
 				wrefresh(win);
 		}
 		//!!!!!!!!!!!!!!!!	
@@ -397,12 +401,13 @@ void Game(WINDOW* win,WIN* main_win,int** visited,int** visited_enemy,int** enem
 			wprintw(win,"AI PIERDUT!");
 		}
 		if(count_hits_enemy == 20 || count_hits_me == 20){
-		{wrefresh(win);
+		wrefresh(win);
 		raw();
-		sleep(5);}
+		sleep(5);
 		break;
 	}
-//counts_hit trebuie sa dispara
+//counts_hit trebuie
+	scr_dump("savefile.txt");
 	}
 }
 //RANDOMLY GENERATING ENEMY BOARD
