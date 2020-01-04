@@ -2,66 +2,90 @@
 #include <ncurses.h>
 #include <string.h>
 #include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
+#include <time.h> // folosesc biblioteca pentru randomizare
+#include <unistd.h> // folosesc biblioteca pentru sleep
 #define MAX_LEN 1000
+//folosesc stuctura pentru customizarea marginii ferestrei cu jocul
 typedef struct _win_border_struct {
 	chtype 	ls, rs, ts, bs, 
 	 	tl, tr, bl, br;
 }WIN_BORDER;
-
+//folosesc structura pentru a construi o fereastra
 typedef struct _WIN_struct {
 
-	int startx, starty;
-	int height, width;
+	int startx, starty;//coordonatele x si y de unde incepe fereastra
+	int height, width;//ce inaltime si grosime are
 	WIN_BORDER border;
 	WINDOW* window;
 }WIN;
+//structura de nave
 typedef struct _nave_struct {
 	int len;
 	int nr; //--> folosit doar pentru generare
-	int startx;
-	int starty;
+	int startx;// coordonata x a pivotului navei
+	int starty;// coordonata y a pivotului navei
 	int direction; // 0 0rizontal 1 vertica1
 	int damaged; // numara cate portiuni din structura navei au fost atacate
 }SHIPS;
+//structura jucatorului
 typedef struct _player_struct{
-	SHIPS* ships;//navele sale
-	int** board;//tabla sa cu 1 pe post de nava si 0 gol
-	int** visited;//ce vasute a incercat pe tabla oponenta
+	SHIPS* ships;//navele jucatorului
+	int** board;//tabla sa. Matrice cu 1 pe post de nava si 0 gol
+	int** visited;//ce casute a incercat jucatorul de pe tabla oponenta
 	int hit;//de cate ori a lovit nava inamica
-	int count_destroyed;//numar cate entitati a distrus playerul
+	int count_destroyed;//numar cate entitati a distrus jucatorul
 }PLAYER;
 //functii
+// transfer un fisier text cu numele filename intr-o matrice
+// de siruri de caractere
 char** file_in_char(char* filename);
+// initializez dinamic memoria unei matrici de numere
 int** init_mat();
+// Urmatoarele 4 functii sunt folosite pentru crearea aleatoare a 
+// navelor pe tabla de joc
+// #1 verific pe orizontala daca se mai pot introduce nave
 int verificare_OR(int y,int x,int len,int** interzis);
+// #2 verific pe verticala daca se mai pot introduce nave
 int verificare_VR(int y,int x,int len,int** interzis);
+// #3 generez pe orizontala o nava
 int nav_gen_OR(int** matrice,int** interzis,int len,SHIPS* nave);
+// #4 generez pe verticala o nava
 int nav_gen_VR(int** matrice,int** interzis,int len,SHIPS* nave);
+// Generez matricea inamicului cu navele 
 int** generate_enemy_board();
+// Generez matricea mea cu navele
 int** my_board_in_01();
 
+// Pnetru meniu (si tot ce e vizibil)
+// Initializez fereastra principala
 void init_main_win(WIN* win,int h,int w,int lines,int cols);
+// Printez marginile ferestrei in care se desfasoara jocul
 void create_box(WIN *p_win);
+// Printez fereastra principala
 void mainScreen(WIN* win,char** ascii_art);
+// Printez fereastra cu optiunile 
 void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices);
-void destroy_win(WINDOW* local_win);//07Win.c
+// Initializez un nou joc - in caz ca apas New Game din fereastra Optiuni
 WINDOW* initNewGame(WIN* main_win);
+// Desfasor rularea jocului
 void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited);
-
+// Creez o noua fereastra de inaltime data cu punctul pivot de coordonate
+// starty si startx
 WINDOW* create_newwin(int height,int width,int starty,int startx);
+// Din matricea de 0 si 1 , unde 1 reprezinta o bucata de nava,
+// creez nave ca entitati individuale cu punte pivot si orientari
 SHIPS* in_entities(int** matrix);
-
-void count_destroyed_mine(PLAYER* player);
-void count_destroyed_enemy(PLAYER* player);
+// identific carei nave apartine bucata lovita in coordonatele y si x
 int which_boat(int y,int x,PLAYER* player,int id_player);
+// printez o tabla grafica in functie de o matrice matrix primita ca argument
 void from_matrix_to_board(int** matrix,WINDOW* win);
+// generez tabla de joc in functie de structurile de nave
 int** generate_board_by_struct(SHIPS* nave,int nr_nave);
+// functie pentru rearanjarea tablei proprii
 void rearange_board(PLAYER* player);
 
 
-//main
+
 int main()
 {
     char** ascii_art;
@@ -74,9 +98,10 @@ int main()
 	noecho();
 	cbreak();
 	keypad(stdscr,TRUE);
+	//salvez in vectorul de siruri de caractere ascii-artul "BATTLESHIPS"
 	ascii_art = file_in_char("ASCII_art.txt");
-
 	WIN Main_win;
+	// initializez fereastra principala
 	init_main_win(&Main_win,30,110,LINES,COLS);
 	create_box(&Main_win);
 	mainScreen(&Main_win,ascii_art);
@@ -92,6 +117,10 @@ int main()
 	PLAYER* player;
 	player = malloc(2*sizeof(PLAYER));
 	int count_visited;
+	int ENTERED = 0;
+	//pentru navigarea prin opituni
+	// Highlight decide ce optiune e evidentiata pentru ca utilizatorul sa
+	// stie ce optiune alege
 	while((ch = getch()))
 	{
 		switch(ch)
@@ -109,63 +138,73 @@ int main()
 			case '\n'://KEY_ENTER n-a mers
 				if(highlight == 1)
 			 	{
-					//initializez player-ul -- init_player(player)
-					player[0].visited = init_mat();//PLAYER 0 visited mine
-					player[1].visited = init_mat();//PALYER 1 visited enemy
-					player[0].board = my_board_in_01();// PLAYER 0 board mine
-					player[1].board = generate_enemy_board();//PLAYER 1 board
+					// initializez structura ambilor jucatori
+					// 1 este calculatorul si 0 e jucatorul-om
+					player[0].visited = init_mat();
+					player[1].visited = init_mat();
+					player[0].board = my_board_in_01();
+					player[1].board = generate_enemy_board();
 					player[0].ships = in_entities(player[0].board);
 					player[1].ships = in_entities(player[1].board);					
 					player[0].hit = 0;
 					player[1].hit = 0;
 					player[1].count_destroyed = 0;
 					player[0].count_destroyed = 0;
+					//numar cate bucati din tabla au fost vizitate
 					count_visited = 0;
+					//initializez noul joc
 					Game_win = initNewGame(&Main_win);
+					//intru in joc
 					Game(Game_win,&Main_win,player,&count_visited);
+					// reinitializez fereastra in care se desfasoara jocul
 					init_main_win(&Main_win,30,110,LINES,COLS);
 					create_box(&Main_win);
 					mainScreen(&Main_win,ascii_art);
 					print_menu(Menu_win,highlight,options,3);
-
+					// pentru a preveni intrarea in resume game fara
+					// a fi jucat niciun joc pana acum
+					ENTERED = 1;
 			 	}
-			 	else if(highlight == 2)
+			 	else if(highlight == 2 && ENTERED == 1)
 			 	{
+			 		// revin la starea jocului de unde a ramas 
 			 		scr_restore("savefile.txt");
 			 		refresh();
+			 		//intru in joc
 			 		Game(Game_win,&Main_win,player,&count_visited);
-					mvprintw(1,1,"%d",count_visited);
+					// initializez ferastra
 					init_main_win(&Main_win,30,110,LINES,COLS);
 					create_box(&Main_win);
 					mainScreen(&Main_win,ascii_art);
 					print_menu(Menu_win,highlight,options,3);
-					//my_turn resume bug
 			 	}
 			 	else if(highlight == 3)
 				exit = 1;
+				// ies din joc
 				break;
 		}	
 		if(exit == 1)
 			break;
 	}
-	endwin();
-	
+	endwin();//se inchide fereastra cu intreg jocul
     return 0;
 }
 void init_main_win(WIN* win,int h,int w,int lines,int cols)
 {
-	win->height = h;
-	win->width = w;
-	win->starty = (lines - win->height)/2;	
-	win->startx = (cols - win->width)/2;
-	win->border.ls = '#';
-	win->border.rs = '#';
-	win->border.ts = '*';
-	win->border.bs = '*';
+	win->height = h;//inaltimea ferestrei principale
+	win->width = w;// latimea ferestrei principale
+	win->starty = (lines - win->height)/2;	//coordonata x a punctului pivot
+	win->startx = (cols - win->width)/2;// coordonata y a punctului pivot
+	win->border.ls = '#';// caracterele de pe marginea stanga
+	win->border.rs = '#';// si de pe marginea dreapta
+	win->border.ts = '*';// caracterele de sus
+	win->border.bs = '*';// si de jos 
 	win->window = newwin(win->height,win->width,win->starty+1,win->startx);
 }
 void mainScreen(WIN* win,char** ascii_art)
 {
+	//printez ascii-art-ul 
+	//mut cursorul in asa fel incat jocul sa fie centrat in fereastra
 	move((LINES - win->height)/2,(COLS - win->width)/2);
 	for(int i = 0 ; i < 6 ; i ++)
 	{
@@ -181,8 +220,9 @@ void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices)
 	y = 2;
 	box(menu_win, 0, 0);
 	for(i = 0; i < n_choices; ++i)
-	{	if(highlight == i + 1) /* High light the present choice */
-		{	wattron(menu_win, A_REVERSE); 
+	{	if(highlight == i + 1) // evidentiez optiunea prin highlight
+		{	
+			wattron(menu_win, A_REVERSE); 
 			mvwprintw(menu_win, y, x, "%s", choices[i]);
 			wattroff(menu_win, A_REVERSE);
 		}
@@ -192,6 +232,7 @@ void print_menu(WINDOW *menu_win, int highlight,char* choices[3],int n_choices)
 	}
 	wrefresh(menu_win);
 }
+//creez o noua fereastra de inaltime heighy si grosime width
 WINDOW* create_newwin(int height,int width,int starty,int startx) 
 {
 	WINDOW* local_win;
@@ -199,17 +240,11 @@ WINDOW* create_newwin(int height,int width,int starty,int startx)
 	wrefresh(local_win);
 	return local_win;
 }
-void destroy_win(WINDOW* local_win)//07Win.c
-{
-	wborder(local_win,' ',' ',' ',' ',' ',' ',' ',' ');
-	wrefresh(local_win);
-	delwin(local_win);
-}
 WINDOW* initNewGame(WIN* main_win)
 {
 	//creez fereastra de joc	
 	WINDOW* win = create_newwin(31,110,main_win->starty+1,main_win->startx);
-	//printare my_board
+	//printez tabla mea
 	char** my_board;
 	my_board = file_in_char("my_board.txt");
 	int y,x,i,j;
@@ -220,7 +255,7 @@ WINDOW* initNewGame(WIN* main_win)
 		mvwprintw(win, y, x, "%s", my_board[i]);
 		++y;
 	}
-	//printare enemy_board - gol
+	//printez tabla inamica goala
 	char** enemy_field;
 	enemy_field = file_in_char("enemy_board.txt");
 	getmaxyx(win,y,x);
@@ -239,6 +274,7 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 //trebuie verificata fiecare nava cu un for anchor pointsi merge pe 
 //orienarea sa in functie de lungime
 {
+	init_pair(1, COLOR_RED, COLOR_BLACK);
 	int y,x,k;
 	getmaxyx(win,y,x);
 	keypad(win,TRUE);
@@ -251,6 +287,7 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 	int count_hits_me = 0;
 	int count_hits_enemy = 0;
 	int attacked = 0;
+	//printez optiunile posibile
 	wmove(win,28,1);
 	wprintw(win,"PRESS Q TO EXIT");
 	wmove(win,27,1);
@@ -259,12 +296,13 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 	wprintw(win,"PRESS R TO REARANGE YOUR BOARD");
 	wmove(win,boardy,boardx);
 	int turn = 0;
-	//for d case
+	// in cazul in care se apasa D , tin minte cate casute vor fi distruse
 	int bombs = 10;
-
 	chr = 'a';
 	while(chr != 'Q')
 	{
+		// daca e randul meu sa atac foloses cheile tastaturii sa ma misc
+		// de-a lungul tablei de joc
 		if(turn == 0)
 		{
 			chr = wgetch(win);
@@ -298,19 +336,24 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 				boardx = boardx - 2;
 			}
 			break;
+			// cu enter selectez celula curenta
 			case '\n':
+			// daca casuta nu a fost vizitata si in celula respectiva se
+			// afla o bucatica de nava atunci apare un X pe celula respectiva
 			if(player[1].board[boardy - 10][(boardx-80)/2] == 1 &&
 			   player[0].visited[boardy - 10][(boardx-80)/2] == 0)
 			{
 				wprintw(win,"X");
 				player[0].visited[boardy - 10][(boardx-80)/2] = 1;
 				player[0].hit = player[0].hit + 1;
+				// verific ce iterator are nava lovita
 				k = which_boat(boardy-10,(boardx-80)/2,player,1);
 				player[1].ships[k].damaged++;
 				attacked = 1;
 				turn = 0;
-
 			}
+			// daca nu e vizitata celula si nu e nimic in celula respectiva
+			// se afiseaza o "-"
 			else if(player[1].board[boardy - 10][(boardx-80)/2] == 0 &&
 			 		player[0].visited[boardy - 10][(boardx-80)/2] == 0)
 			{
@@ -325,24 +368,30 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 			bombs = 10;
 			while(bombs != 0 && *count_visited<100)
 			{
-				// /sleep(1);
+				// aleg 10 celule nealese pe care sa le incerce in
+				// fiecare parte
 				int y_rand = rand() % 10;
 				int x_rand = rand() % 10;
+				// caut un y si un x pana cand gasesc o celula nevizitata
 				while(player[1].visited[y_rand][x_rand] == 1)
 				{
 					y_rand = rand() % 10;
 					x_rand = rand() % 10;
 				}
 				player[1].visited[y_rand][x_rand] = 1;
+				// daca nimereste o nava inamica afiseaza #
 				if(player[0].board[y_rand][x_rand] == 1)
 					{
 						wmove(win,y_rand+10,x_rand*2+11);
+						attron(COLOR_PAIR(1));
 						wprintw(win,"#");
+						attroff(COLOR_PAIR(1));
 						player[1].hit++;//schimba
 						int k = which_boat(y_rand,x_rand,player,0);
 						player[0].ships[k].damaged++;
 						wmove(win,boardy,boardx);
 				}
+				// daca nu nimereste printeaza "-"
 				else
 				{
 					wmove(win,y_rand+10,x_rand*2+11);
@@ -352,11 +401,13 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 				//configurat pentru a ataca partea inamica
 				y_rand = rand() % 10;
 				x_rand = rand() % 10;
+				// caut un y si un x pana cand gasesc o celula nevizitata
 				while(player[0].visited[y_rand][x_rand] == 1)
 				{
 					y_rand = rand() % 10;
 					x_rand = rand() % 10;
 				}
+				// daca nimeresc o bucata de nava se marcheaza cu un X
 				player[0].visited[y_rand][x_rand] = 1;
 				if(player[1].board[y_rand][x_rand] == 1)
 				{
@@ -367,6 +418,7 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 						player[1].ships[k].damaged++;
 						wmove(win,boardy,boardx);
 				}
+				// daca nu nimeresc se noteaza cu o liniuta
 				else
 				{
 					wmove(win,y_rand+ 10 ,x - 30 + (x_rand)*2+1);
@@ -376,11 +428,16 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 				wrefresh(win);
 				bombs--;
 				*count_visited = *count_visited + 1;
+				// se numara vizitele pentru a nu depasi numarul  maxim de 
+				// incercari
 			}
 			break;
-			case 'R': 	
+			case 'R':
+			// reinitializez numarul de lovituri 	
 			player[1].hit = 0;
+			//reinitializez matricea vizitata
 			player[1].visited = init_mat();
+			//rearanjez tabgla
 			rearange_board(&player[0]);
 			from_matrix_to_board(player[0].board,win);
 			wmove(win,boardy,boardx);
@@ -394,7 +451,9 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 		while(turn == 1 && *count_visited < 100)
 		if(attacked == 1)
 		{
-			sleep(1);
+			//daca am atacat calculatorul, asteapta doua secunde, dupa care
+			// se ia in considerare o alta miscare
+		//	sleep(2);
 			//!!!numar 3 secunde in care se va aplica getch()!!!!
 			attacked = 0;
 			int y_rand = rand() % 10;
@@ -408,13 +467,19 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 			if(player[0].board[y_rand][x_rand] == 1)
 			{
 				wmove(win,y_rand+10,x_rand*2+11);
+				attron(COLOR_PAIR(1));
 				wprintw(win,"#");
-				player[1].hit++;//schimba
-				k = which_boat(boardy - 10,boardx/2 - 40,player,0);
+				attroff(COLOR_PAIR(1));
+				player[1].hit++;//daca inamicul a lovit, 
+				//creste numarul de lovituri 
+				k = which_boat(y_rand,x_rand,player,0);
 				player[0].ships[k].damaged++;//ce barca a fost lovita
 				wmove(win,boardy,boardx);
-				turn = 1;
-				attacked = 1;
+				turn = 1;//setez ca tura sa fie a jucatorului
+				attacked = 1;//retin ca inamicul a atacat
+				//aceasta variabila e folosita pentru a permite
+				//jucatorului (PC sau uman) sa poata ataca iar
+				//in cazul in care loveste o bucata de nava
 			}
 			else
 			{
@@ -428,22 +493,37 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 			wrefresh(win);
 		}
 		wrefresh(win);	
-		if(player[0].hit == 20) 
+		// daca e egalitate, jocul printeaza in mijloc sus mesajul DRAW !
+		if(player[0].hit == 20 && player[1].hit == 20) 
 		{
 			wmove(win,5,boardx/2 + 5);
-			wprintw(win,"AI CASTIGAT!");
+			wprintw(win,"DRAW !");
+		
 		}
+		// daca ai pierdut apare esajul YOU LSOT !
 		else if(player[1].hit == 20)
 		{
 			wmove(win,5,boardx/2 + 5);
-			wprintw(win,"AI PIERDUT!");
+			wprintw(win,"YOU LOST !");
 		}
-		//cate nave am distrus la final
+		// daca ai castigat apare mesajul YOU WON !
+		else if(player[0].hit == 20)
+		{
+			wmove(win,5,boardx/2 + 5);
+			wprintw(win,"YOU WON !");
+		}
+		//salvez intr-un savefile starea jocului in care ma aflu 
+		// pentru cazul in care jucatorul vrea sa iasa si sa 
+		// foloseasca optiunea RESUME GAME
 		scr_dump("savefile.txt");
 		int index;
 		if(player[1].hit == 20 || player[0].hit == 20
 			|| *count_visited >= 100)
 		{
+		// iau fiecare nava la rnad, din fiecare tabla, si verific cate 
+		// parti din ele au fost ditruse.
+		// daca partile distruse sunt in numar egale cu lungimea lor 
+		// atunci navele se considera ca fiind distruse complet
 		for(index = 0; index < 10;index++)
 		{
 			if(player[0].ships[index].damaged == player[0].ships[index].len)
@@ -456,59 +536,63 @@ void Game(WINDOW* win,WIN* main_win,PLAYER* player,int* count_visited)
 				player[0].count_destroyed++;
 			}
 		}
+		// sub starea finala a jocului se afiseaza numarul de nave distruse
+		// de fiecare dintre jucatori
 		wmove(win,6,boardx/2 + 5);
-		wprintw(win,"INAMICUL A DISTRUS %d NAVE",player[1].count_destroyed);
+		wprintw(win,"THE ENEMY DESTROYED %d SHIPS",player[1].count_destroyed);
 		wmove(win,7,boardx/2 + 5);
-		wprintw(win,"AI DISTRUS %d NAVE",player[0].count_destroyed);
+		wprintw(win,"YOU DESTROYED %d SHIPS",player[0].count_destroyed);
 		wrefresh(win);
 		raw();
-		sleep(5);
+		//dupa terminarea jocurlui , acesta devine inactiv 10 secunde
+		sleep(10);
 		break;
 		}
 	}
 }
-//1 inamic, 0 eu
-//pentru final
-
 void rearange_board(PLAYER* player)
 {
 	int i;
 	SHIPS* nava;
 	int nr = 0;
 	int** matrix = init_mat();
-	nava = malloc(10 * sizeof(SHIPS));
+	nava = malloc(10 * sizeof(SHIPS));//aloc memorie pentru nava
 	for( i = 0 ; i < 10 ; i++)
 	{
+		//iau fiecare nava si verific daca a fost distrusa
+		//daca nu a fost distrusa
 		if(player->ships[i].damaged != player->ships[i].len)
 		{
 			//resetez lungimea
 			player->ships[i].len -= player->ships[i].damaged;
-			//resetez damaged
+			//resetez cate casute avea lovite
 			player->ships[i].damaged = 0;
 			nava[nr] = player->ships[i];
+			//salvez navele care nu sunt complet distruse
 			nr++;
 		}
 	}
-	
+	//creez tabla in functie de navele noi formate
 	player->board = generate_board_by_struct(nava,nr);
-	//from matrix to board
 	nr = 0;
-		for( i = 0 ; i < 10; i ++)
+	for( i = 0 ; i < 10; i ++)
 	{
+		//dau navelor vechi valoarea navelor noi
 		if(player->ships[i].damaged != player->ships[i].len)
 		{
 			player->ships[i] = nava[nr]; 
 			nr++;
 		}
 	}
-
 }
 int which_boat(int y,int x,PLAYER* player,int id_player)
 {
-	//aflu anchor point-ul
+	//aflu punctul pivot
 	int found = 0;
 	while(found == 0)
 	{
+		// ma deplasez pe orizontala sau pe veritcala pana gasesc
+		//punctul pivot
 		if(x - 1 >=0 && player[id_player].board[y][x-1] == 1)
 			x = x - 1;
 		else if(y - 1 >= 0 && player[id_player].board[y-1][x] == 1)
@@ -518,6 +602,7 @@ int which_boat(int y,int x,PLAYER* player,int id_player)
 	}	
 	//verific carei nave apartine
 	int i;
+	//refac coordonatele punctului pivot pentru fiecare nava
 	for(i = 0 ; i < 10; i ++)
 	{
 		if(player[id_player].ships[i].startx == x && 
@@ -528,7 +613,6 @@ int which_boat(int y,int x,PLAYER* player,int id_player)
 		}
 	}
 }
-//RANDOMLY GENERATING ENEMY BOARD
 int** init_mat()
 {
 	int** matrice;
@@ -542,6 +626,9 @@ int verificare_OR(int y,int x,int len,int** interzis)
 {
 	int i,j;
 	int ok = 1;
+	//interzis reprezinta faptul ca nu am voie sa pun o nava acolo
+	//el se actualizeaza pe masura ce sa aseaza navele
+	//verific daca nava mea va intra pe o casuta interzisa
 	for( j = x; j < x + len ;j++ )
 	{
 		if(interzis[y][j] == 2)
@@ -552,20 +639,28 @@ int verificare_OR(int y,int x,int len,int** interzis)
 	}
 	return ok;
 }
+
 int nav_gen_OR(int** matrice,int** interzis,int len,SHIPS* nave)
 {
 	int i,j;
+	//lucrez pe o matrice de la 1 la 10
+	//se genereaza doua coordonate aleatoare care reprezinta pivotul navei
 	int diry = rand()%10 + 1;
-	int dirx = rand()%(10 - len - 1) + 1;//(10 - len - 1)
+	int dirx = rand()%(10 - len - 1) + 1;
 	int ok; 
+	// verific daca pozitia e valabila
 	ok = verificare_OR(diry,dirx,len,interzis);
 	if(ok == 1)
 	{
 		nave->starty = diry-1;
 		nave->startx = dirx-1;
+		//pentru fiecare celula de-a lungul lungimii navei 
+		// se vor construi :
 		for( j = dirx; j < dirx + len ;j++ )
 		{
+			// nava
 			matrice[diry][j] = 1;
+			//zonele care devin inaccesibile altor nave
 			interzis[diry][j] = 2;
 			interzis[diry-1][j] = 2;
 			interzis[diry+1][j] = 2;
@@ -577,8 +672,10 @@ int nav_gen_OR(int** matrice,int** interzis,int len,SHIPS* nave)
 		interzis[diry+1][dirx-1] = 2;
 		interzis[diry-1][dirx-1] = 2;	
 	}
+	//se returneaza daca nava a putu sau nu fi pusa in locul aleatoru
 	return ok;
 }
+// analog ca mai sus, doar ca pe verticala
 int verificare_VR(int y,int x,int len,int** interzis)
 {
 	int i,j;
@@ -619,6 +716,7 @@ int nav_gen_VR(int** matrice,int** interzis,int len,SHIPS* nave)
 	}
 	return ok;
 }
+//transform o matrice de la 1 la 10 sa fie de la 0 la 9
 void normalize(int** matrix)
 {
 	int i,j;
@@ -631,10 +729,11 @@ void normalize(int** matrix)
 		}
 	}
 }
-int** generate_enemy_board()//mtrebuie modificat
+int** generate_enemy_board()
 {
 	int** matrice = init_mat();
 	int** interzis = init_mat();
+	//initial sunt 4 tipuri de nave
 	SHIPS nave[4];
 	//numar nave
 	nave[0].nr = 1;
@@ -651,7 +750,7 @@ int** generate_enemy_board()//mtrebuie modificat
 	srand(time(0)); 
 	int dir_rand;
 	int verif_if_placed;
-	while(index_nave<4)//struct de nave, fiecare cu lungimea ei,fiecare cate sunt
+	while(index_nave<4)
 	{	
 		//luam fiecare tip de nave la rand;
 		dir_rand = rand()%2;
@@ -687,7 +786,7 @@ int** generate_board_by_struct(SHIPS* nave,int nr_nave)
 	int verif_if_placed;
 	while(index_nave < nr_nave)
 	{	
-		//luam fiecare tip de nave la rand;
+		//luam fiecare tip de nava la rand;
 		dir_rand = rand()%2;
 		if(dir_rand == 1)//orizontal
 		{
@@ -701,10 +800,10 @@ int** generate_board_by_struct(SHIPS* nave,int nr_nave)
 		verif_if_placed = nav_gen_VR(matrice,interzis,nave[index_nave].len
 									,&nave[index_nave]);
 		}
-		if(verif_if_placed == 1)
+		if(verif_if_placed == 1) // daca pozitia era valabila
 		index_nave++;
 	}
-	normalize(matrice);
+	normalize(matrice);//transofrm intr-o matrice de la 0 la 9
 	return matrice;
 }
 void from_matrix_to_board(int** matrix,WINDOW* win)
@@ -734,14 +833,14 @@ void from_matrix_to_board(int** matrix,WINDOW* win)
 		++y;
 	}
 }
-//MAKING MY BOARD
+//pentru tabla mea
 int** my_board_in_01()
 {
 	char** string;
 	int** my_matrix = init_mat();
 	int i,j;
 
-	//transformare text caractere in matrice 0 si 1 -  sau detecteaza x
+	//transform text caractere in matrice 0 si 1
 	string = file_in_char("my_board.txt");
 
 	for(i = 0 ; i < 10 ; i ++)
@@ -800,12 +899,20 @@ SHIPS* in_entities(int** matrix)
 	{
 		for(j = 0; j < 10; j ++)
 		{
+			// incep cautarea de la stanga la dreapta si de sus in jos
+			// daca gasesc un "1" care nu a facut pana atunci parte 
+			//dintr-o nava, este considerat punctul pivot al navei
 			if(matrix[i][j] == 1 && visited[i][j] == 0)
 			{
+				//retin coordonatele punctului pivot
 				nave[nr_nave].starty = i;
 				nave[nr_nave].startx = j;
+				//initializez lungimea acestuia
 				nave[nr_nave].len = 1;
+				//initializez de cate ori a fost lovit
 				nave[nr_nave].damaged = 0;
+				//si notez celula respectiva ca fiind vizitata
+				//pentru a evita eventuale erori de suprapunere
 				visited[i][j] = 1;
 				nave[nr_nave].direction = -1;
 				//daca nava e orizontala

@@ -1,6 +1,6 @@
-build: GAME
-	gcc 00GAME.c -lncurses -lpanel -o GAME
-run:
+GAME : 
+	gcc 00GAME.c -lncurses -o GAME
+run : savefile.txt
 	./GAME
 clean:
-	rm GAME
+	rm GAME 
