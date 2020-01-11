@@ -1,6 +1,18 @@
 ***IMPORTANT !***
 **PENTRU A PUTEA FI JUCAT, CONSOLA TREBUIE SA FIE FULLSCREEN (sau minim
 125x41)**
+
+***RULARE***
+make battleships
+make run sau ./battleships <my_board.txt>
+Daca rularea va fi manuala , atunci pentru o nuoa compilare va fi nevoie
+sa stergeti executabilul curent
+***CERINTE REZOVLATE***
+* Cerinta 1
+* Cerinta 2
+* Cerinta 3
+* Cerinta 4
+* Cerinta 5
 ___________________________________________________________________________
 
 ***FEREASTRA PRINCIPALA***
@@ -64,3 +76,7 @@ se considera ca a fost lovita o nava, si creste atat "hit", cat si atributul
 - Se noteaza cu "-" daca a fost aleasa o celula fara nava
 - Se noteaza cu "X" daca jucatorul a nimerit o bucata de nava inamica
 - Se noteaza cu "#" daca o nava proprie a fost lovita
+
+***DESIGN***
+- La fiecare actiune pe tabla de joc se vor aduaga culori pentru a semnala
+schimbarea facuta

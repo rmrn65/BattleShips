@@ -1,6 +1,4 @@
-GAME : 
-	gcc 00GAME.c -lncurses -o GAME
-run : savefile.txt
-	./GAME
-clean:
-	rm GAME 
+battleships :
+	gcc battleships.c -lncurses -o battleships
+run : 
+	./battleships my_board.txt; rm battleships
